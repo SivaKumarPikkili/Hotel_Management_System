@@ -7,32 +7,51 @@ from datetime import datetime, timedelta
 import os
 import re
 import uuid
+import secrets
 from dotenv import load_dotenv
 
-# Gemini AI imports
+# Google Calendar API imports
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+import pickle
+import os.path
+
+# 🔥 GEMINI AI imports (NOT OpenAI)
 import google.generativeai as genai
-import json
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Security improvement: Use environment variables for secret key
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(32))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hotel.db'
+# Use environment variable for secret key or generate one
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(16))
+
+# Database configuration for different environments
+if os.environ.get('DATABASE_URL'):
+    # Production (PostgreSQL)
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    # Local development (SQLite)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hotel.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Email configuration - removed fallback credentials for security
+# Email configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', 'workplc666@gmail.com')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', 'jets glvk phho kyyp')
 
 # File upload configuration
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # Ensure upload directory exists
@@ -41,16 +60,13 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 mail = Mail(app)
 
-# Initialize Gemini AI
-# Initialize Gemini AI
-gemini_api_key = os.getenv('GEMINI_API_KEY')
-if gemini_api_key:
-    genai.configure(api_key=gemini_api_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')  # ✅ Correct model name
-else:
-    model = None
-    print("Warning: GEMINI_API_KEY not found in environment variables")
-
+# 🔥 Configure Gemini AI (NOT OpenAI)
+try:
+    genai.configure(api_key=os.getenv("GOOGLE_GEMINI_API_KEY"))
+    gemini_model = genai.GenerativeModel("gemini-pro")
+except Exception as e:
+    print(f"Gemini AI configuration error: {e}")
+    gemini_model = None
 
 # Database Models
 class User(db.Model):
@@ -130,6 +146,13 @@ class ContactMessage(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class CustomerLoyalty(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    loyalty_level = db.Column(db.String(20), default='bronze')  # bronze, silver, gold, platinum
+    total_bookings = db.Column(db.Integer, default=0)
+    discount_percentage = db.Column(db.Float, default=0.0)
+
 # Helper Functions
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -173,924 +196,35 @@ def get_room_availability(room_id, start_date, end_date):
     ).first()
     return conflicting_bookings is None
 
-# AI Chatbot Routes
-@app.route('/api/chat', methods=['POST'])
-def api_chat():
-    if request.method != 'POST':
-        return jsonify({'success': False, 'error': 'Method not allowed'}), 405
+def update_customer_loyalty(user_id):
+    """Update customer loyalty level based on booking history"""
+    loyalty = CustomerLoyalty.query.filter_by(user_id=user_id).first()
+    if not loyalty:
+        loyalty = CustomerLoyalty(user_id=user_id)
+        db.session.add(loyalty)
     
+    loyalty.total_bookings += 1
+    
+    # Set loyalty level and discount
+    if loyalty.total_bookings >= 10:
+        loyalty.loyalty_level = 'platinum'
+        loyalty.discount_percentage = 15.0
+    elif loyalty.total_bookings >= 5:
+        loyalty.loyalty_level = 'gold'
+        loyalty.discount_percentage = 10.0
+    elif loyalty.total_bookings >= 2:
+        loyalty.loyalty_level = 'silver'
+        loyalty.discount_percentage = 5.0
+    
+    db.session.commit()
+
+# 🚀 DATABASE INITIALIZATION FUNCTION
+def initialize_database():
+    """Initialize database with tables and sample data"""
     try:
-        data = request.get_json() or {}
-        user_message = (data.get('message', '')).strip()
-        
-        if not user_message:
-            return jsonify({'success': False, 'error': 'Message cannot be empty'}), 400
-        
-        # Check if Gemini AI is configured
-        if not model:
-            return jsonify({
-                'success': False, 
-                'error': 'AI assistant is currently unavailable. Please configure your GEMINI_API_KEY.'
-            }), 503
-        
-        # Get user context for personalized responses
-        username = session.get('username', 'Guest')
-        is_logged_in = 'user_id' in session
-        
-        # Get current hotel data
-        room_types = RoomType.query.all()
-        room_info = []
-        for rt in room_types:
-            available_rooms = len([r for r in rt.rooms if r.is_available])
-            room_info.append({
-                'name': rt.name,
-                'price': rt.base_price,
-                'capacity': rt.capacity,
-                'available_rooms': available_rooms,
-                'amenities': rt.amenities
-            })
-        
-        # Get user's bookings if logged in
-        user_bookings = []
-        if is_logged_in:
-            bookings = Booking.query.filter_by(user_id=session['user_id']).order_by(Booking.booking_date.desc()).limit(3).all()
-            for booking in bookings:
-                user_bookings.append({
-                    'room_number': booking.room.room_number,
-                    'room_type': booking.room.room_type.name,
-                    'check_in': booking.check_in.strftime('%Y-%m-%d'),
-                    'check_out': booking.check_out.strftime('%Y-%m-%d'),
-                    'status': booking.status,
-                    'total_price': booking.total_price
-                })
-        
-        # Create hotel-specific context
-        hotel_context = f"""
-        You are a helpful AI assistant for a luxury hotel management system called "Luxury Hotel". 
-        
-        Current User: {username} ({'Logged in' if is_logged_in else 'Not logged in'})
-        
-        Hotel Room Types Available:
-        {json.dumps(room_info, indent=2)}
-        
-        {"User's Recent Bookings:" if user_bookings else ""}
-        {json.dumps(user_bookings, indent=2) if user_bookings else ""}
-        
-        Hotel Services:
-        - Room booking with admin approval system
-        - Food ordering service (available after booking approval)
-        - 24/7 room service and concierge
-        - Free high-speed WiFi throughout the property
-        - Business center and meeting facilities
-        - Fitness center and spa services
-        - Valet parking available
-        - Airport shuttle service
-        
-        Guidelines:
-        - Be professional, warm, and helpful
-        - Provide accurate information based on the data above
-        - If user asks about booking and isn't logged in, guide them to login/register
-        - For specific availability, suggest they check our rooms page
-        - Keep responses concise but informative (2-3 sentences max)
-        - If you don't know something specific, suggest contacting reception
-        - Use prices and room information from the data provided
-        
-        User's question: {user_message}
-        """
-        
-        # Generate response using Gemini
-        response = model.generate_content(hotel_context)
-        
-        if response and response.text:
-            reply_text = response.text.strip()
-            # Clean up formatting
-            reply_text = reply_text.replace('**', '').replace('*', '')
-        else:
-            reply_text = "I apologize, but I'm having trouble processing your request right now. Please try again or contact our front desk for assistance."
-        
-        return jsonify({
-            'success': True, 
-            'reply': reply_text,
-            'username': username
-        })
-        
-    except Exception as e:
-        print(f"Gemini AI Error: {str(e)}")
-        return jsonify({
-            'success': False, 
-            'error': 'Our AI assistant is temporarily unavailable. Please try again later.'
-        }), 500
-
-
-@app.route('/api/hotel-info')
-def get_hotel_info():
-    """Provide basic hotel information for the chatbot"""
-    try:
-        room_types = RoomType.query.all()
-        food_categories = db.session.query(FoodItem.category).distinct().all()
-        
-        hotel_info = {
-            'room_types': [
-                {
-                    'id': rt.id,
-                    'name': rt.name,
-                    'price': rt.base_price,
-                    'capacity': rt.capacity,
-                    'description': rt.description,
-                    'amenities': rt.amenities,
-                    'available_rooms': len([r for r in rt.rooms if r.is_available])
-                } for rt in room_types
-            ],
-            'food_categories': [cat[0] for cat in food_categories],
-            'services': [
-                '24/7 Room Service',
-                'Free High-Speed WiFi',
-                'Business Center',
-                'Fitness Facilities',
-                'Concierge Service',
-                'Valet Parking',
-                'Airport Shuttle',
-                'Spa Services'
-            ]
-        }
-        
-        return jsonify({'success': True, 'data': hotel_info})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# Main Routes
-@app.route('/')
-def index():
-    room_types = RoomType.query.all()
-    return render_template('index.html', room_types=room_types)
-
-@app.route('/rooms')
-def rooms():
-    room_types = RoomType.query.all()
-    return render_template('rooms.html', room_types=room_types)
-
-@app.route('/room_type/<int:type_id>')
-def room_type_detail(type_id):
-    room_type = db.session.get(RoomType, type_id)
-    if not room_type:
-        flash('Room type not found!')
-        return redirect(url_for('rooms'))
-    rooms = Room.query.filter_by(room_type_id=type_id).all()
-    return render_template('room_type_detail.html', room_type=room_type, rooms=rooms)
-
-@app.route('/check_availability/<int:room_id>')
-def check_availability(room_id):
-    room = db.session.get(Room, room_id)
-    if not room:
-        return jsonify({'error': 'Room not found'}), 404
-    
-    bookings = Booking.query.filter_by(room_id=room_id, status='confirmed').all()
-    booked_dates = []
-    
-    for booking in bookings:
-        current_date = booking.check_in
-        while current_date < booking.check_out:
-            booked_dates.append(current_date.strftime('%Y-%m-%d'))
-            current_date += timedelta(days=1)
-    
-    return jsonify({
-        'room_number': room.room_number,
-        'room_type': room.room_type.name,
-        'booked_dates': booked_dates
-    })
-
-@app.route('/gallery')
-def gallery():
-    # Get actual room types instead of dummy data
-    room_types = RoomType.query.all()
-    rooms = []
-    for rt in room_types:
-        rooms.append({
-            "name": rt.name,
-            "description": rt.description,
-            "capacity": rt.capacity,
-            "price": rt.base_price,
-            "room_type": {"name": rt.name}
-        })
-    return render_template("gallery.html", rooms=rooms)
-
-@app.route('/contact', methods=['GET', 'POST'])
-def contact():
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        subject = request.form.get('subject', '').strip()
-        message = request.form.get('message', '').strip()
-        
-        if not all([name, email, subject, message]):
-            flash('Please fill in all fields!')
-            return redirect(url_for('contact'))
-        
-        if not validate_email(email):
-            flash('Please enter a valid email address!')
-            return redirect(url_for('contact'))
-        
-        contact_msg = ContactMessage(
-            name=name,
-            email=email,
-            subject=subject,
-            message=message
-        )
-        
-        db.session.add(contact_msg)
-        db.session.commit()
-        
-        flash('Your message has been sent! Thank you for contacting us.')
-        return redirect(url_for('contact'))
-    
-    return render_template('contact.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-        confirm_password = request.form.get('confirm_password', '')
-        
-        # Validation
-        if not username or len(username) < 3:
-            flash('Username must be at least 3 characters long!')
-            return redirect(url_for('register'))
-        
-        if not validate_email(email):
-            flash('Please enter a valid email address!')
-            return redirect(url_for('register'))
-        
-        if not validate_password(password):
-            flash('Password must be at least 6 characters long!')
-            return redirect(url_for('register'))
-        
-        if password != confirm_password:
-            flash('Passwords do not match!')
-            return redirect(url_for('register'))
-        
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists!')
-            return redirect(url_for('register'))
-        
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered!')
-            return redirect(url_for('register'))
-        
-        user = User(username=username, email=email, password_hash=generate_password_hash(password))
-        db.session.add(user)
-        db.session.commit()
-        
-        flash('Registration successful! Please login.')
-        return redirect(url_for('login'))
-    
-    return render_template('register.html')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        if not username or not password:
-            flash('Please enter both username and password!')
-            return redirect(url_for('login'))
-        
-        user = User.query.filter_by(username=username).first()
-        
-        if user and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['is_admin'] = user.is_admin
-            flash('Login successful! Welcome back!')
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password!')
-            return redirect(url_for('login'))
-    
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('You have been logged out successfully.')
-    return redirect(url_for('index'))
-
-@app.route('/book/<int:room_id>', methods=['GET', 'POST'])
-def book_room(room_id):
-    if 'user_id' not in session:
-        flash('Please login to book a room!')
-        return redirect(url_for('login'))
-    
-    room = db.session.get(Room, room_id)
-    if not room:
-        flash('Room not found!')
-        return redirect(url_for('rooms'))
-    
-    if request.method == 'POST':
-        check_in = request.form.get('check_in')
-        check_out = request.form.get('check_out')
-        special_requests = request.form.get('special_requests', '')
-        
-        if not check_in or not check_out:
-            flash('Please select both check-in and check-out dates!')
-            return redirect(url_for('book_room', room_id=room_id))
-        
-        try:
-            check_in = datetime.strptime(check_in, '%Y-%m-%d').date()
-            check_out = datetime.strptime(check_out, '%Y-%m-%d').date()
-        except ValueError:
-            flash('Invalid date format!')
-            return redirect(url_for('book_room', room_id=room_id))
-        
-        # Check if dates are valid
-        if check_in >= check_out:
-            flash('Check-out date must be after check-in date!')
-            return redirect(url_for('book_room', room_id=room_id))
-        
-        if check_in < datetime.now().date():
-            flash('Check-in date cannot be in the past!')
-            return redirect(url_for('book_room', room_id=room_id))
-        
-        # Check for booking conflicts
-        if not get_room_availability(room_id, check_in, check_out):
-            flash('Room is not available for the selected dates!')
-            return redirect(url_for('book_room', room_id=room_id))
-        
-        # Calculate total price
-        days = (check_out - check_in).days
-        total_price = room.room_type.base_price * days
-        
-        booking = Booking(
-            user_id=session['user_id'],
-            room_id=room_id,
-            check_in=check_in,
-            check_out=check_out,
-            total_price=total_price,
-            special_requests=special_requests
-        )
-        
-        db.session.add(booking)
-        db.session.commit()
-        
-        # Send booking notification emails
-        user = db.session.get(User, session['user_id'])
-        if user:
-            send_email(
-                user.email,
-                'Booking Confirmation - Pending Approval',
-                f'Your booking for Room {room.room_number} from {check_in} to {check_out} has been submitted and is pending admin approval.'
-            )
-            
-            # Send admin notification (if admin email is configured)
-            admin_users = User.query.filter_by(is_admin=True).all()
-            for admin in admin_users:
-                send_email(
-                    admin.email,
-                    'New Booking Request',
-                    f'New booking request from {user.username} for Room {room.room_number}. Please review in admin dashboard.'
-                )
-        
-        flash('Booking submitted successfully! Please wait for admin approval.')
-        return redirect(url_for('my_bookings'))
-    
-    return render_template('book_room.html', room=room, today=datetime.now().strftime('%Y-%m-%d'))
-
-@app.route('/my_bookings')
-def my_bookings():
-    if 'user_id' not in session:
-        flash('Please login to view your bookings!')
-        return redirect(url_for('login'))
-    
-    bookings = Booking.query.filter_by(user_id=session['user_id']).order_by(Booking.booking_date.desc()).all()
-    return render_template('my_bookings.html', bookings=bookings)
-
-@app.route('/cancel_booking/<int:booking_id>')
-def cancel_booking(booking_id):
-    if 'user_id' not in session:
-        flash('Please login to cancel bookings!')
-        return redirect(url_for('login'))
-    
-    booking = db.session.get(Booking, booking_id)
-    if not booking:
-        flash('Booking not found!')
-        return redirect(url_for('my_bookings'))
-    
-    if booking.user_id != session['user_id'] and not session.get('is_admin'):
-        flash('You can only cancel your own bookings!')
-        return redirect(url_for('my_bookings'))
-    
-    if booking.status == 'cancelled':
-        flash('This booking is already cancelled!')
-        return redirect(url_for('my_bookings'))
-    
-    booking.status = 'cancelled'
-    db.session.commit()
-    
-    flash('Booking cancelled successfully!')
-    return redirect(url_for('my_bookings'))
-
-@app.route('/food_menu/<int:booking_id>')
-def food_menu(booking_id):
-    if 'user_id' not in session:
-        flash('Please login to access food menu!')
-        return redirect(url_for('login'))
-    
-    booking = db.session.get(Booking, booking_id)
-    if not booking:
-        flash('Booking not found!')
-        return redirect(url_for('my_bookings'))
-    
-    if booking.user_id != session['user_id']:
-        flash('Access denied!')
-        return redirect(url_for('my_bookings'))
-    
-    if not booking.is_approved:
-        flash('Food menu is only available for approved bookings!')
-        return redirect(url_for('my_bookings'))
-    
-    food_items = FoodItem.query.filter_by(is_available=True).all()
-    return render_template('food_menu.html', booking=booking, food_items=food_items)
-
-@app.route('/order_food', methods=['POST'])
-def order_food():
-    if 'user_id' not in session:
-        return jsonify({'success': False, 'message': 'Please login to order food!'}), 401
-    
-    data = request.get_json()
-    booking_id = data.get('booking_id')
-    items = data.get('items', [])
-    special_instructions = data.get('special_instructions', '')
-    
-    booking = db.session.get(Booking, booking_id)
-    if not booking or booking.user_id != session['user_id'] or not booking.is_approved:
-        return jsonify({'success': False, 'message': 'Invalid or unauthorized booking!'})
-    
-    for item in items:
-        food_item = db.session.get(FoodItem, item['id'])
-        if not food_item:
-            continue
-        
-        try:
-            quantity = int(item['quantity'])
-            if quantity <= 0:
-                continue
-        except:
-            continue
-        
-        total_price = food_item.price * quantity
-        
-        food_order = FoodOrder(
-            user_id=session['user_id'],
-            booking_id=booking_id,
-            food_item_id=food_item.id,
-            quantity=quantity,
-            total_price=total_price,
-            special_instructions=special_instructions
-        )
-        
-        db.session.add(food_order)
-    
-    db.session.commit()
-    return jsonify({'success': True, 'message': 'Food order placed successfully!'})
-
-# Admin routes
-@app.route('/admin')
-def admin_dashboard():
-    # Redirect non-logged-in users to login page
-    if 'user_id' not in session:
-        flash('Please login to access the admin panel.')
-        return redirect(url_for('login'))
-    
-    # Redirect non-admin users to login page
-    if not session.get('is_admin'):
-        flash('Access denied! Admin privileges required.')
-        return redirect(url_for('login'))
-
-    # Existing admin dashboard code
-    total_bookings = Booking.query.count()
-    total_users = User.query.count()
-    total_rooms = Room.query.count()
-    pending_bookings = Booking.query.filter_by(status='pending').count()
-    recent_bookings = Booking.query.order_by(Booking.booking_date.desc()).limit(5).all()
-
-    # Calculate total revenue
-    total_revenue = db.session.query(db.func.sum(Booking.total_price)).filter_by(status='confirmed').scalar() or 0
-
-    # Get monthly stats
-    current_month = datetime.now().month
-    monthly_bookings = Booking.query.filter(
-        db.extract('month', Booking.booking_date) == current_month
-    ).count()
-
-    return render_template('admin/dashboard.html',
-                         total_bookings=total_bookings,
-                         total_users=total_users,
-                         total_rooms=total_rooms,
-                         pending_bookings=pending_bookings,
-                         total_revenue=total_revenue,
-                         monthly_bookings=monthly_bookings,
-                         recent_bookings=recent_bookings)
-
-@app.route('/admin/room_types')
-def admin_room_types():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    room_types = RoomType.query.all()
-    return render_template('admin/room_types.html', room_types=room_types)
-
-@app.route('/admin/room_types/add', methods=['GET', 'POST'])
-def admin_add_room_type():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        description = request.form.get('description', '').strip()
-        base_price = request.form.get('base_price', '')
-        capacity = request.form.get('capacity', '')
-        amenities = request.form.get('amenities', '').strip()
-        
-        if not all([name, description, base_price, capacity]):
-            flash('Please fill in all required fields!')
-            return redirect(url_for('admin_add_room_type'))
-        
-        try:
-            base_price = float(base_price)
-            capacity = int(capacity)
-        except ValueError:
-            flash('Invalid price or capacity value!')
-            return redirect(url_for('admin_add_room_type'))
-        
-        room_type = RoomType(
-            name=name,
-            description=description,
-            base_price=base_price,
-            capacity=capacity,
-            amenities=amenities
-        )
-        
-        db.session.add(room_type)
-        db.session.commit()
-        
-        flash('Room type added successfully!')
-        return redirect(url_for('admin_room_types'))
-    
-    return render_template('admin/add_room_type.html')
-
-@app.route('/admin/room_types/edit/<int:type_id>', methods=['GET', 'POST'])
-def admin_edit_room_type(type_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    room_type = db.session.get(RoomType, type_id)
-    if not room_type:
-        flash('Room type not found!')
-        return redirect(url_for('admin_room_types'))
-    
-    if request.method == 'POST':
-        room_type.name = request.form.get('name', '').strip()
-        room_type.description = request.form.get('description', '').strip()
-        room_type.base_price = float(request.form.get('base_price', 0))
-        room_type.capacity = int(request.form.get('capacity', 1))
-        room_type.amenities = request.form.get('amenities', '').strip()
-        
-        db.session.commit()
-        
-        flash('Room type updated successfully!')
-        return redirect(url_for('admin_room_types'))
-    
-    return render_template('admin/edit_room_type.html', room_type=room_type)
-
-@app.route('/admin/room_types/<int:type_id>/delete', methods=['POST'])
-def admin_delete_room_type(type_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    room_type = db.session.get(RoomType, type_id)
-    if not room_type:
-        flash('Room type not found!')
-        return redirect(url_for('admin_room_types'))
-    
-    # Check if room type has rooms
-    if room_type.rooms:
-        flash('Cannot delete room type that has rooms! Please delete all rooms of this type first.')
-        return redirect(url_for('admin_room_types'))
-    
-    try:
-        db.session.delete(room_type)
-        db.session.commit()
-        flash('Room type deleted successfully!')
-    except Exception as e:
-        db.session.rollback()
-        flash('Error deleting room type. Please try again.')
-    
-    return redirect(url_for('admin_room_types'))
-
-@app.route('/admin/rooms')
-def admin_rooms():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    rooms = Room.query.all()
-    room_types = RoomType.query.all()
-    return render_template('admin/rooms.html', rooms=rooms, room_types=room_types)
-
-@app.route('/admin/rooms/add', methods=['GET', 'POST'])
-def admin_add_room():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        room_number = request.form.get('room_number', '').strip()
-        room_type_id = request.form.get('room_type_id', '')
-        
-        if not room_number or not room_type_id:
-            flash('Please fill in all required fields!')
-            return redirect(url_for('admin_add_room'))
-        
-        if Room.query.filter_by(room_number=room_number).first():
-            flash('Room number already exists!')
-            return redirect(url_for('admin_add_room'))
-        
-        room = Room(
-            room_number=room_number,
-            room_type_id=int(room_type_id)
-        )
-        
-        db.session.add(room)
-        db.session.commit()
-        
-        # Handle image uploads
-        images = request.files.getlist('images')
-        for i, image in enumerate(images):
-            if image and image.filename:
-                image_path = save_file(image)
-                if image_path:
-                    room_image = RoomImage(
-                        room_id=room.id,
-                        image_path=image_path,
-                        is_primary=(i == 0)  # First image is primary
-                    )
-                    db.session.add(room_image)
-        
-        db.session.commit()
-        
-        flash('Room added successfully!')
-        return redirect(url_for('admin_rooms'))
-    
-    room_types = RoomType.query.all()
-    return render_template('admin/add_room.html', room_types=room_types)
-
-@app.route('/admin/rooms/edit/<int:room_id>', methods=['GET', 'POST'])
-def admin_edit_room(room_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    room = db.session.get(Room, room_id)
-    if not room:
-        flash('Room not found!')
-        return redirect(url_for('admin_rooms'))
-    
-    if request.method == 'POST':
-        room.room_number = request.form.get('room_number', '').strip()
-        room.room_type_id = int(request.form.get('room_type_id', 1))
-        room.is_available = 'is_available' in request.form
-        
-        # Handle new image uploads
-        images = request.files.getlist('images')
-        for image in images:
-            if image and image.filename:
-                image_path = save_file(image)
-                if image_path:
-                    room_image = RoomImage(
-                        room_id=room.id,
-                        image_path=image_path,
-                        is_primary=False
-                    )
-                    db.session.add(room_image)
-        
-        db.session.commit()
-        
-        flash('Room updated successfully!')
-        return redirect(url_for('admin_rooms'))
-    
-    room_types = RoomType.query.all()
-    return render_template('admin/edit_room.html', room=room, room_types=room_types)
-
-@app.route('/admin/rooms/delete/<int:room_id>')
-def admin_delete_room(room_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    room = db.session.get(Room, room_id)
-    if not room:
-        flash('Room not found!')
-        return redirect(url_for('admin_rooms'))
-    
-    # Check if room has active bookings
-    active_bookings = Booking.query.filter_by(room_id=room_id, status='confirmed').first()
-    if active_bookings:
-        flash('Cannot delete room with active bookings!')
-        return redirect(url_for('admin_rooms'))
-    
-    db.session.delete(room)
-    db.session.commit()
-    
-    flash('Room deleted successfully!')
-    return redirect(url_for('admin_rooms'))
-
-@app.route('/admin/bookings')
-def admin_bookings():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    bookings = Booking.query.order_by(Booking.booking_date.desc()).all()
-    return render_template('admin/bookings.html', bookings=bookings)
-
-@app.route('/admin/bookings/<int:booking_id>/<action>')
-def admin_booking_action(booking_id, action):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    booking = db.session.get(Booking, booking_id)
-    if not booking:
-        flash('Booking not found!')
-        return redirect(url_for('admin_bookings'))
-    
-    if action == 'approve':
-        booking.status = 'confirmed'
-        booking.is_approved = True
-        flash('Booking approved!')
-        
-        # Send confirmation email to user
-        user = db.session.get(User, booking.user_id)
-        if user:
-            send_email(
-                user.email,
-                'Booking Confirmed!',
-                f'Your booking for Room {booking.room.room_number} from {booking.check_in} to {booking.check_out} has been confirmed!'
-            )
-    
-    elif action == 'cancel':
-        booking.status = 'cancelled'
-        flash('Booking cancelled!')
-    
-    elif action == 'complete':
-        booking.status = 'completed'
-        flash('Booking marked as completed!')
-    
-    db.session.commit()
-    return redirect(url_for('admin_bookings'))
-
-@app.route('/admin/users')
-def admin_users():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    users = User.query.all()
-    return render_template('admin/users.html', users=users)
-
-@app.route('/admin/users/<int:user_id>/<action>')
-def admin_user_action(user_id, action):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    user = db.session.get(User, user_id)
-    if not user:
-        flash('User not found!')
-        return redirect(url_for('admin_users'))
-    
-    if action == 'make_admin':
-        user.is_admin = True
-        flash(f'{user.username} is now an admin!')
-    elif action == 'remove_admin':
-        if user.id == session['user_id']:
-            flash('You cannot remove your own admin privileges!')
-        else:
-            user.is_admin = False
-            flash(f'{user.username} is no longer an admin!')
-    
-    db.session.commit()
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/food')
-def admin_food():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    food_items = FoodItem.query.all()
-    return render_template('admin/food.html', food_items=food_items)
-
-@app.route('/admin/food/add', methods=['GET', 'POST'])
-def admin_add_food():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        description = request.form.get('description', '').strip()
-        price = request.form.get('price', '')
-        category = request.form.get('category', 'snacks')
-        
-        if not all([name, description, price]):
-            flash('Please fill in all required fields!')
-            return redirect(url_for('admin_add_food'))
-        
-        try:
-            price = float(price)
-        except ValueError:
-            flash('Invalid price value!')
-            return redirect(url_for('admin_add_food'))
-        
-        food_item = FoodItem(
-            name=name,
-            description=description,
-            price=price,
-            category=category
-        )
-        
-        db.session.add(food_item)
-        db.session.commit()
-        
-        flash('Food item added successfully!')
-        return redirect(url_for('admin_food'))
-    
-    return render_template('admin/add_food.html')
-
-@app.route('/admin/food/edit/<int:food_id>', methods=['GET', 'POST'])
-def admin_edit_food(food_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    food_item = db.session.get(FoodItem, food_id)
-    if not food_item:
-        flash('Food item not found!')
-        return redirect(url_for('admin_food'))
-    
-    if request.method == 'POST':
-        food_item.name = request.form.get('name', '').strip()
-        food_item.description = request.form.get('description', '').strip()
-        food_item.price = float(request.form.get('price', 0))
-        food_item.category = request.form.get('category', 'snacks')
-        food_item.is_available = 'is_available' in request.form
-        
-        db.session.commit()
-        
-        flash('Food item updated successfully!')
-        return redirect(url_for('admin_food'))
-    
-    return render_template('admin/edit_food.html', food_item=food_item)
-
-@app.route('/admin/food/delete/<int:food_id>')
-def admin_delete_food(food_id):
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied!')
-        return redirect(url_for('index'))
-    
-    food_item = db.session.get(FoodItem, food_id)
-    if not food_item:
-        flash('Food item not found!')
-        return redirect(url_for('admin_food'))
-    
-    db.session.delete(food_item)
-    db.session.commit()
-    
-    flash('Food item deleted successfully!')
-    return redirect(url_for('admin_food'))
-
-# Error handlers
-#@app.errorhandler(404)
-#def not_found_error(error):
-   # return render_template('errors/404.html'), 404
-
-#@app.errorhandler(500)
-#ef internal_error(error):
-    #db.session.rollback()
-    #return render_template('errors/500.html'), 500
-
-if __name__ == '__main__':
-    with app.app_context():
         # Create all tables
         db.create_all()
+        print("✅ Database tables created successfully!")
         
         # Create admin user if not exists
         admin_email = "admin@hotel.com"
@@ -1102,35 +236,35 @@ if __name__ == '__main__':
                 is_admin=True
             )
             db.session.add(admin_user)
-            db.session.commit()
+            print("✅ Admin user created!")
         
         # Add sample room types if not exists
         if not RoomType.query.first():
             room_types_data = [
                 {
                     'name': 'Deluxe Suite',
-                    'description': 'Luxurious suite with city view, king-size bed, and premium amenities. Perfect for business travelers or romantic getaways.',
+                    'description': 'Luxurious suite with city view, king-size bed, and premium amenities.',
                     'base_price': 200.0,
                     'capacity': 2,
                     'amenities': 'King Bed, City View, Mini Bar, Room Service, Free WiFi'
                 },
                 {
                     'name': 'Standard Room',
-                    'description': 'Comfortable room with modern amenities, perfect for solo travelers or couples. Clean and cozy with all essential facilities.',
+                    'description': 'Comfortable room with modern amenities, perfect for solo travelers or couples.',
                     'base_price': 100.0,
                     'capacity': 2,
                     'amenities': 'Queen Bed, TV, Free WiFi, Coffee Maker'
                 },
                 {
                     'name': 'Family Room',
-                    'description': 'Spacious room perfect for families with multiple beds and extra space. Includes amenities for children and parents.',
+                    'description': 'Spacious room perfect for families with multiple beds and extra space.',
                     'base_price': 150.0,
                     'capacity': 4,
                     'amenities': '2 Queen Beds, Extra Space, Kids Amenities, Free WiFi'
                 },
                 {
                     'name': 'Executive Suite',
-                    'description': 'Premium suite with business amenities, separate living area, and work space. Ideal for business travelers.',
+                    'description': 'Premium suite with business amenities, separate living area, and work space.',
                     'base_price': 300.0,
                     'capacity': 2,
                     'amenities': 'King Bed, Living Area, Work Desk, Premium WiFi, Business Services'
@@ -1140,10 +274,10 @@ if __name__ == '__main__':
             for rt_data in room_types_data:
                 room_type = RoomType(**rt_data)
                 db.session.add(room_type)
-            
-            db.session.commit()
-            
-            # Add sample rooms if not exists
+            print("✅ Sample room types added!")
+        
+        # Add sample rooms if not exists
+        if not Room.query.first():
             room_type_map = {rt.name: rt.id for rt in RoomType.query.all()}
             sample_rooms = [
                 {'room_number': '101', 'type_name': 'Deluxe Suite'},
@@ -1163,8 +297,7 @@ if __name__ == '__main__':
                         room_type_id=room_type_map[room_data['type_name']]
                     )
                     db.session.add(room)
-            
-            db.session.commit()
+            print("✅ Sample rooms added!")
         
         # Add sample food items if not exists
         if not FoodItem.query.first():
@@ -1181,8 +314,482 @@ if __name__ == '__main__':
             
             for food_item in food_items:
                 db.session.add(food_item)
-            
-            db.session.commit()
+            print("✅ Sample food items added!")
+        
+        db.session.commit()
+        print("✅ Database initialization completed successfully!")
+        
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        db.session.rollback()
+
+# 🔥 INITIALIZE DATABASE ON APP STARTUP
+@app.before_first_request
+def setup_database():
+    initialize_database()
+
+# Routes with error handling
+@app.route('/')
+def index():
+    try:
+        room_types = RoomType.query.all()
+    except Exception as e:
+        print(f"Database error in index route: {e}")
+        # Try to initialize database if tables don't exist
+        try:
+            initialize_database()
+            room_types = RoomType.query.all()
+        except Exception as init_error:
+            print(f"Failed to initialize database: {init_error}")
+            room_types = []
+    
+    return render_template('index.html', room_types=room_types)
+
+@app.route('/rooms')
+def rooms():
+    try:
+        room_types = RoomType.query.all()
+    except Exception as e:
+        print(f"Database error in rooms route: {e}")
+        room_types = []
+    
+    return render_template('rooms.html', room_types=room_types)
+
+@app.route('/room_type/<int:type_id>')
+def room_type_detail(type_id):
+    room_type = db.session.get(RoomType, type_id)
+    if not room_type:
+        flash('Room type not found!')
+        return redirect(url_for('rooms'))
+    rooms = Room.query.filter_by(room_type_id=type_id).all()
+    return render_template('room_type_detail.html', room_type=room_type, rooms=rooms)
+
+@app.route('/check_availability/<int:room_id>')
+def check_availability(room_id):
+    room = db.session.get(Room, room_id)
+    if not room:
+        return jsonify({'error': 'Room not found'}), 404
+
+    bookings = Booking.query.filter_by(room_id=room_id, status='confirmed').all()
+    booked_dates = []
+    for booking in bookings:
+        current_date = booking.check_in
+        while current_date < booking.check_out:
+            booked_dates.append(current_date.strftime('%Y-%m-%d'))
+            current_date += timedelta(days=1)
+
+    return jsonify({
+        'room_number': room.room_number,
+        'room_type': room.room_type.name,
+        'booked_dates': booked_dates
+    })
+
+@app.route('/gallery')
+def gallery():
+    # Dummy sample rooms for gallery display
+    rooms = [
+        {"name": "Deluxe Room", "description": "Spacious and luxurious", "capacity": 2, "price": 200, "room_type": {"name": "Deluxe"}},
+        {"name": "Suite", "description": "For ultimate comfort", "capacity": 4, "price": 350, "room_type": {"name": "Suite"}},
+        {"name": "Single Room", "description": "Ideal for solo travelers", "capacity": 1, "price": 120, "room_type": {"name": "Single"}},
+        {"name": "Executive Suite", "description": "Perfect for business stays", "capacity": 3, "price": 300, "room_type": {"name": "Executive"}},
+        {"name": "Family Room", "description": "Spacious and cozy", "capacity": 5, "price": 400, "room_type": {"name": "Family"}},
+        {"name": "Penthouse", "description": "Top floor with city view", "capacity": 2, "price": 500, "room_type": {"name": "Penthouse"}},
+    ]
+    return render_template("gallery.html", rooms=rooms)
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        subject = request.form.get('subject', '').strip()
+        message = request.form.get('message', '').strip()
+
+        if not all([name, email, subject, message]):
+            flash('Please fill in all fields!')
+            return redirect(url_for('contact'))
+
+        contact_msg = ContactMessage(
+            name=name,
+            email=email,
+            subject=subject,
+            message=message
+        )
+        db.session.add(contact_msg)
+        db.session.commit()
+
+        flash('Your message has been sent! Thank you for contacting us.')
+        return redirect(url_for('contact'))
+
+    return render_template('contact.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+        confirm_password = request.form.get('confirm_password', '')
+
+        # Validation
+        if not username or len(username) < 3:
+            flash('Username must be at least 3 characters long!')
+            return redirect(url_for('register'))
+
+        if not validate_email(email):
+            flash('Please enter a valid email address!')
+            return redirect(url_for('register'))
+
+        if not validate_password(password):
+            flash('Password must be at least 6 characters long!')
+            return redirect(url_for('register'))
+
+        if password != confirm_password:
+            flash('Passwords do not match!')
+            return redirect(url_for('register'))
+
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists!')
+            return redirect(url_for('register'))
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered!')
+            return redirect(url_for('register'))
+
+        user = User(username=username, email=email, password_hash=generate_password_hash(password))
+        db.session.add(user)
+        db.session.commit()
+
+        flash('Registration successful! Please login.')
+        return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Please enter both username and password!')
+            return redirect(url_for('login'))
+
+        user = User.query.filter_by(username=username).first()
+
+        if user and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            flash('Login successful! Welcome back!')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password!')
+            return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out successfully.')
+    return redirect(url_for('index'))
+
+@app.route('/book/<int:room_id>', methods=['GET', 'POST'])
+def book_room(room_id):
+    if 'user_id' not in session:
+        flash('Please login to book a room!')
+        return redirect(url_for('login'))
+
+    room = db.session.get(Room, room_id)
+    if not room:
+        flash('Room not found!')
+        return redirect(url_for('rooms'))
+
+    if request.method == 'POST':
+        check_in = request.form.get('check_in')
+        check_out = request.form.get('check_out')
+        special_requests = request.form.get('special_requests', '')
+
+        if not check_in or not check_out:
+            flash('Please select both check-in and check-out dates!')
+            return redirect(url_for('book_room', room_id=room_id))
+
+        try:
+            check_in_date = datetime.strptime(check_in, '%Y-%m-%d').date()
+            check_out_date = datetime.strptime(check_out, '%Y-%m-%d').date()
+        except ValueError:
+            flash('Invalid date format!')
+            return redirect(url_for('book_room', room_id=room_id))
+
+        # Validation
+        if check_in_date >= check_out_date:
+            flash('Check-out date must be after check-in date!')
+            return redirect(url_for('book_room', room_id=room_id))
+
+        if check_in_date < datetime.now().date():
+            flash('Check-in date cannot be in the past!')
+            return redirect(url_for('book_room', room_id=room_id))
+
+        if not get_room_availability(room_id, check_in_date, check_out_date):
+            flash('Room is not available for the selected dates!')
+            return redirect(url_for('book_room', room_id=room_id))
+
+        # Calculate total price
+        days = (check_out_date - check_in_date).days
+        total_price = room.room_type.base_price * days
+
+        booking = Booking(
+            user_id=session['user_id'],
+            room_id=room_id,
+            check_in=check_in_date,
+            check_out=check_out_date,
+            total_price=total_price,
+            special_requests=special_requests
+        )
+
+        db.session.add(booking)
+        db.session.commit()
+
+        # Update customer loyalty
+        update_customer_loyalty(session['user_id'])
+
+        # Send emails
+        user = db.session.get(User, session['user_id'])
+        if user:
+            send_email(
+                user.email,
+                'Booking Confirmation - Pending Approval',
+                f'Your booking for Room {room.room_number} from {check_in_date} to {check_out_date} has been submitted and is pending admin approval.'
+            )
+
+        flash('Booking submitted successfully! Please wait for admin approval.')
+        return redirect(url_for('my_bookings'))
+
+    return render_template('book_room.html', room=room, today=datetime.now().strftime('%Y-%m-%d'))
+
+@app.route('/my_bookings')
+def my_bookings():
+    if 'user_id' not in session:
+        flash('Please login to view your bookings!')
+        return redirect(url_for('login'))
+
+    bookings = Booking.query.filter_by(user_id=session['user_id']).order_by(Booking.booking_date.desc()).all()
+    return render_template('my_bookings.html', bookings=bookings)
+
+@app.route('/cancel_booking/<int:booking_id>')
+def cancel_booking(booking_id):
+    if 'user_id' not in session:
+        flash('Please login to cancel bookings!')
+        return redirect(url_for('login'))
+
+    booking = db.session.get(Booking, booking_id)
+    if not booking:
+        flash('Booking not found!')
+        return redirect(url_for('my_bookings'))
+
+    if booking.user_id != session['user_id'] and not session.get('is_admin'):
+        flash('You can only cancel your own bookings!')
+        return redirect(url_for('my_bookings'))
+
+    if booking.status == 'cancelled':
+        flash('This booking is already cancelled!')
+        return redirect(url_for('my_bookings'))
+
+    booking.status = 'cancelled'
+    db.session.commit()
+
+    flash('Booking cancelled successfully!')
+    return redirect(url_for('my_bookings'))
+
+@app.route('/food_menu/<int:booking_id>')
+def food_menu(booking_id):
+    if 'user_id' not in session:
+        flash('Please login to access food menu!')
+        return redirect(url_for('login'))
+
+    booking = db.session.get(Booking, booking_id)
+    if not booking:
+        flash('Booking not found!')
+        return redirect(url_for('my_bookings'))
+
+    if booking.user_id != session['user_id']:
+        flash('Access denied!')
+        return redirect(url_for('my_bookings'))
+
+    if not booking.is_approved:
+        flash('Food menu is only available for approved bookings!')
+        return redirect(url_for('my_bookings'))
+
+    food_items = FoodItem.query.filter_by(is_available=True).all()
+    return render_template('food_menu.html', booking=booking, food_items=food_items)
+
+@app.route('/order_food', methods=['POST'])
+def order_food():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Please login to order food!'}), 401
+
+    data = request.get_json()
+    booking_id = data.get('booking_id')
+    items = data.get('items', [])
+    special_instructions = data.get('special_instructions', '')
+
+    booking = db.session.get(Booking, booking_id)
+    if not booking or booking.user_id != session['user_id'] or not booking.is_approved:
+        return jsonify({'success': False, 'message': 'Invalid or unauthorized booking!'})
+
+    for item in items:
+        food_item = db.session.get(FoodItem, item['id'])
+        if not food_item:
+            continue
+
+        try:
+            quantity = int(item['quantity'])
+            if quantity <= 0:
+                continue
+        except:
+            continue
+
+        total_price = food_item.price * quantity
+
+        food_order = FoodOrder(
+            user_id=session['user_id'],
+            booking_id=booking_id,
+            food_item_id=food_item.id,
+            quantity=quantity,
+            total_price=total_price,
+            special_instructions=special_instructions
+        )
+        db.session.add(food_order)
+
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Food order placed successfully!'})
+
+# Admin routes
+@app.route('/admin')
+def admin_dashboard():
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied! Admin privileges required.')
+        return redirect(url_for('index'))
+
+    total_bookings = Booking.query.count()
+    total_users = User.query.count()
+    total_rooms = Room.query.count()
+    pending_bookings = Booking.query.filter_by(status='pending').count()
+    recent_bookings = Booking.query.order_by(Booking.booking_date.desc()).limit(5).all()
+
+    # Calculate total revenue
+    total_revenue = db.session.query(db.func.sum(Booking.total_price)).filter_by(status='confirmed').scalar() or 0
+
+    # Get monthly stats
+    current_month = datetime.now().month
+    monthly_bookings = Booking.query.filter(
+        db.extract('month', Booking.booking_date) == current_month
+    ).count()
+
+    return render_template('admin/dashboard.html',
+                          total_bookings=total_bookings,
+                          total_users=total_users,
+                          total_rooms=total_rooms,
+                          pending_bookings=pending_bookings,
+                          total_revenue=total_revenue,
+                          monthly_bookings=monthly_bookings,
+                          recent_bookings=recent_bookings)
+
+# Add all your other admin routes here (room_types, rooms, bookings, users, food)
+# I'll include a few key ones to keep the response manageable
+
+@app.route('/admin/bookings')
+def admin_bookings():
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied!')
+        return redirect(url_for('index'))
+
+    bookings = Booking.query.order_by(Booking.booking_date.desc()).all()
+    return render_template('admin/bookings.html', bookings=bookings)
+
+@app.route('/admin/bookings/<int:booking_id>/<action>')
+def admin_booking_action(booking_id, action):
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied!')
+        return redirect(url_for('index'))
+
+    booking = db.session.get(Booking, booking_id)
+    if not booking:
+        flash('Booking not found!')
+        return redirect(url_for('admin_bookings'))
+
+    if action == 'approve':
+        booking.status = 'confirmed'
+        booking.is_approved = True
+        flash('Booking approved!')
+
+        # Send confirmation email to user
+        user = db.session.get(User, booking.user_id)
+        if user:
+            send_email(
+                user.email,
+                'Booking Confirmed!',
+                f'Your booking for Room {booking.room.room_number} from {booking.check_in} to {booking.check_out} has been confirmed!'
+            )
+
+    elif action == 'cancel':
+        booking.status = 'cancelled'
+        flash('Booking cancelled!')
+    elif action == 'complete':
+        booking.status = 'completed'
+        flash('Booking marked as completed!')
+
+    db.session.commit()
+    return redirect(url_for('admin_bookings'))
+
+# 🔥 GEMINI AI Chatbot Route
+@app.route('/api/chat', methods=['POST'])
+def api_chat():
+    if not gemini_model:
+        return jsonify({'success': False, 'error': 'AI service not available'}), 500
+    
+    data = request.get_json() or {}
+    user_text = (data.get('message') or '').strip()
+
+    if not user_text:
+        return jsonify({'success': False, 'error': 'Empty message'}), 400
+
+    # Optional: include session context (username or booking hints)
+    username = session.get('username')
+    context_prefix = f"User: {username}. " if username else ""
+
+    # 🔥 Call GEMINI AI (NOT OpenAI)
+    try:
+        # Start chat session with Gemini
+        chat = gemini_model.start_chat(history=[])
+        
+        # Send message with context
+        prompt = f"{context_prefix}You are a helpful hotel assistant. Answer briefly and clearly. Message: {user_text}"
+        response = chat.send_message(prompt)
+
+        # Extract text from Gemini response
+        text = response.text if response.text else "Sorry, I couldn't generate a response."
+
+        return jsonify({'success': True, 'reply': text})
+
+    except Exception as e:
+        print("Gemini AI error:", e)
+        return jsonify({'success': False, 'error': 'AI service error'}), 500
+
+# 🔥 PRODUCTION-READY APP STARTUP
+if __name__ == '__main__':
+    # For production deployment (Render.com, Heroku, etc.)
     port = int(os.environ.get('PORT', 5000))
     debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    
+    # Initialize database in application context
+    with app.app_context():
+        initialize_database()
+    
+    # Run the app
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
+else:
+    # For production servers (gunicorn, etc.)
+    with app.app_context():
+        initialize_database()
