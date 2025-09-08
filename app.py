@@ -63,7 +63,7 @@ mail = Mail(app)
 # 🔥 Configure Gemini AI (NOT OpenAI)
 try:
     genai.configure(api_key=os.getenv("GOOGLE_GEMINI_API_KEY"))
-    gemini_model = genai.GenerativeModel("gemini-pro")
+    gemini_model = genai.GenerativeModel("gemini-2.5-pro")
 except Exception as e:
     print(f"Gemini AI configuration error: {e}")
     gemini_model = None
