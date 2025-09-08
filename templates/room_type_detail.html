@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}{{ room_type.name }} - Luxury Hotel{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('rooms') }}">Rooms</a></li>
+                <li class="breadcrumb-item active">{{ room_type.name }}</li>
+            </ol>
+        </nav>
+        <div class="row">
+            <div class="col-lg-8">
+                <h1 class="display-4 mb-3">{{ room_type.name }}</h1>
+                <p class="lead text-muted">{{ room_type.description }}</p>
+                <div class="d-flex align-items-center mb-3">
+                    <h3 class="text-primary mb-0 me-3">${{ room_type.base_price }}</h3>
+                    <span class="text-muted">per night</span>
+                </div>
+                <div class="d-flex gap-3">
+                    <span class="badge bg-secondary fs-6">{{ room_type.capacity }} Guests</span>
+                    <span class="badge bg-success fs-6">{{ rooms|length }} Rooms Available</span>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Quick Info</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-users me-2 text-primary"></i>Capacity: {{ room_type.capacity }} guests</li>
+                            <li><i class="fas fa-bed me-2 text-primary"></i>Room Type: {{ room_type.name }}</li>
+                            <li><i class="fas fa-dollar-sign me-2 text-primary"></i>Price: ${{ room_type.base_price }}/night</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Room Details Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <!-- Room Images and Description -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h4>Room Description</h4>
+                        <p>{{ room_type.description }}</p>
+                        
+                        {% if room_type.amenities %}
+                        <h5 class="mt-4">Amenities</h5>
+                        <div class="row">
+                            {% for amenity in room_type.amenities.split(', ') %}
+                            <div class="col-md-6 mb-2">
+                                <i class="fas fa-check text-success me-2"></i>{{ amenity }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Available Rooms -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Available Rooms</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if rooms %}
+                            {% for room in rooms %}
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                                <div>
+                                    <h6 class="mb-1">Room {{ room.room_number }}</h6>
+                                    <small class="text-muted">{{ room_type.name }}</small>
+                                </div>
+                                <div class="text-end">
+                                    {% if room.is_available %}
+                                        <span class="badge bg-success">Available</span>
+                                        <br>
+                                        <a href="{{ url_for('book_room', room_id=room.id) }}" class="btn btn-primary btn-sm mt-1">
+                                            Book Now
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-danger">Occupied</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">No rooms available for this type.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Availability Calendar Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h3 class="text-center mb-4">Check Availability</h3>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="calendar-container">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="room-select" class="form-label">Select Room</label>
+                                <select class="form-select" id="room-select">
+                                    <option value="">Choose a room...</option>
+                                    {% for room in rooms %}
+                                    <option value="{{ room.id }}">Room {{ room.room_number }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="date-range" class="form-label">Date Range</label>
+                                <input type="text" class="form-control" id="date-range" placeholder="Select dates...">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Booking Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 text-center">
+                <h3>Ready to Book?</h3>
+                <p class="lead">Select an available room and choose your dates to make a reservation.</p>
+                {% if session.user_id %}
+                    <a href="{{ url_for('rooms') }}" class="btn btn-primary btn-lg">Browse All Rooms</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Login to Book</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roomSelect = document.getElementById('room-select');
+    const dateRange = document.getElementById('date-range');
+    let calendar;
+    
+    // Initialize calendar
+    const calendarEl = document.getElementById('calendar');
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth'
+        },
+        selectable: true,
+        select: function(info) {
+            if (roomSelect.value) {
+                // Handle date selection
+                console.log('Selected dates:', info.startStr, info.endStr);
+            }
+        },
+        events: []
+    });
+    calendar.render();
+    
+    // Handle room selection
+    roomSelect.addEventListener('change', function() {
+        if (this.value) {
+            fetch(`/check_availability/${this.value}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Clear existing events
+                    calendar.removeAllEvents();
+                    
+                    // Add booked dates as events
+                    const events = data.booked_dates.map(date => ({
+                        title: 'Booked',
+                        start: date,
+                        end: date,
+                        backgroundColor: '#dc3545',
+                        borderColor: '#dc3545',
+                        display: 'background'
+                    }));
+                    
+                    calendar.addEventSource(events);
+                });
+        }
+    });
+    
+    // Initialize date range picker
+    flatpickr("#date-range", {
+        mode: "range",
+        minDate: "today",
+        dateFormat: "Y-m-d",
+        onChange: function(selectedDates, dateStr, instance) {
+            if (selectedDates.length === 2 && roomSelect.value) {
+                // Handle date range selection
+                console.log('Date range selected:', dateStr);
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

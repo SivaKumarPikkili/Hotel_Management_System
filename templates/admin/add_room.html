@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Add Room - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <nav class="col-md-3 col-lg-2 d-md-block admin-sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_room_types') }}">
+                            <i class="fas fa-bed me-2"></i>Room Types
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('admin_rooms') }}">
+                            <i class="fas fa-door-open me-2"></i>Rooms
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_bookings') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Bookings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_users') }}">
+                            <i class="fas fa-users me-2"></i>Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_food') }}">
+                            <i class="fas fa-utensils me-2"></i>Food Menu
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Add New Room</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="{{ url_for('admin_rooms') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Rooms
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">Room Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" enctype="multipart/form-data">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="room_number" class="form-label">Room Number *</label>
+                                        <input type="text" class="form-control" id="room_number" name="room_number" required>
+                                        <div class="form-text">e.g., 101, 102, 201, 202</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="room_type_id" class="form-label">Room Type *</label>
+                                        <select class="form-select" id="room_type_id" name="room_type_id" required>
+                                            <option value="">Select Room Type</option>
+                                            {% for room_type in room_types %}
+                                            <option value="{{ room_type.id }}">
+                                                {{ room_type.name }} - ${{ "%.2f"|format(room_type.base_price) }}/night
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">Choose the category for this room</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="images" class="form-label">Room Images</label>
+                                    <input type="file" class="form-control" id="images" name="images" multiple accept="image/*">
+                                    <div class="form-text">
+                                        You can select multiple images. The first image will be the primary image.
+                                        Supported formats: JPG, PNG, GIF, WebP (max 16MB each)
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{{ url_for('admin_rooms') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Room
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h6 class="mb-0">Room Type Information</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if room_types %}
+                                {% for room_type in room_types %}
+                                <div class="border-bottom pb-2 mb-2">
+                                    <h6 class="text-primary">{{ room_type.name }}</h6>
+                                    <small class="text-muted">{{ room_type.description[:100] }}...</small>
+                                    <div class="mt-2">
+                                        <span class="badge bg-success">${{ "%.2f"|format(room_type.base_price) }}/night</span>
+                                        <span class="badge bg-info">{{ room_type.capacity }} Guests</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted">No room types available. Please add room types first.</p>
+                                <a href="{{ url_for('admin_add_room_type') }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-plus me-1"></i>Add Room Type
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card shadow mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Tips for Adding Rooms</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-info-circle text-primary me-2"></i>
+                                    <strong>Room Number:</strong> Use logical numbering (101, 102, etc.)
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-bed text-success me-2"></i>
+                                    <strong>Room Type:</strong> Choose the appropriate category
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-image text-warning me-2"></i>
+                                    <strong>Images:</strong> Upload high-quality photos
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-check text-info me-2"></i>
+                                    <strong>Availability:</strong> Rooms are available by default
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card shadow mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Example Room Numbers</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <h6 class="text-primary">Floor 1</h6>
+                                    <small class="text-muted">101, 102, 103, 104</small>
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="text-success">Floor 2</h6>
+                                    <small class="text-muted">201, 202, 203, 204</small>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-6">
+                                    <h6 class="text-info">Floor 3</h6>
+                                    <small class="text-muted">301, 302, 303, 304</small>
+                                </div>
+                                <div class="col-6">
+                                    <h6 class="text-warning">Floor 4</h6>
+                                    <small class="text-muted">401, 402, 403, 404</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Preview selected images
+document.getElementById('images').addEventListener('change', function(e) {
+    const files = e.target.files;
+    const previewContainer = document.createElement('div');
+    previewContainer.className = 'mt-3';
+    previewContainer.innerHTML = '<h6>Selected Images:</h6>';
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.className = 'img-thumbnail me-2 mb-2';
+                img.style.width = '100px';
+                img.style.height = '75px';
+                img.style.objectFit = 'cover';
+                previewContainer.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    // Remove existing preview
+    const existingPreview = document.querySelector('.mt-3');
+    if (existingPreview && existingPreview.querySelector('h6').textContent === 'Selected Images:') {
+        existingPreview.remove();
+    }
+    
+    if (files.length > 0) {
+        document.getElementById('images').parentNode.appendChild(previewContainer);
+    }
+});
+
+// Room type selection change
+document.getElementById('room_type_id').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    if (selectedOption.value) {
+        console.log('Selected room type:', selectedOption.text);
+    }
+});
+</script>
+{% endblock %} 

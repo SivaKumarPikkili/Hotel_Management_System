@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}My Bookings - Luxury Hotel{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h1 class="display-4 mb-3">My Bookings</h1>
+        <p class="lead text-muted">View and manage your hotel reservations</p>
+    </div>
+</section>
+
+<!-- Bookings Section -->
+<section class="py-5">
+    <div class="container">
+        {% if bookings %}
+            <div class="row">
+                {% for booking in bookings %}
+                <div class="col-lg-8 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Room {{ booking.room.room_number }} - {{ booking.room.room_type.name }}</h5>
+                            <div>
+                                {% if booking.status == 'pending' %}
+                                    <span class="badge bg-warning">Pending Approval</span>
+                                {% elif booking.status == 'confirmed' %}
+                                    <span class="badge bg-success">Confirmed</span>
+                                {% elif booking.status == 'cancelled' %}
+                                    <span class="badge bg-danger">Cancelled</span>
+                                {% elif booking.status == 'completed' %}
+                                    <span class="badge bg-secondary">Completed</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Booking Details</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-calendar-check me-2 text-primary"></i>Check-in: {{ booking.check_in.strftime('%B %d, %Y') }}</li>
+                                        <li><i class="fas fa-calendar-times me-2 text-primary"></i>Check-out: {{ booking.check_out.strftime('%B %d, %Y') }}</li>
+                                        <li><i class="fas fa-users me-2 text-primary"></i>Guests: {{ booking.room.room_type.capacity }}</li>
+                                        <li><i class="fas fa-dollar-sign me-2 text-primary"></i>Total: ${{ "%.2f"|format(booking.total_price) }}</li>
+                                        <li><i class="fas fa-clock me-2 text-primary"></i>Booked: {{ booking.booking_date.strftime('%B %d, %Y at %I:%M %p') }}</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Room Information</h6>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-bed me-2 text-primary"></i>Room Type: {{ booking.room.room_type.name }}</li>
+                                        <li><i class="fas fa-star me-2 text-primary"></i>Price: ${{ booking.room.room_type.base_price }}/night</li>
+                                        {% if booking.room.room_type.amenities %}
+                                        <li><i class="fas fa-list me-2 text-primary"></i>Amenities: {{ booking.room.room_type.amenities[:50] }}...</li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            {% if booking.special_requests %}
+                            <div class="mt-3">
+                                <h6>Special Requests</h6>
+                                <p class="text-muted">{{ booking.special_requests }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mt-3 d-flex gap-2">
+                                {% if booking.status == 'pending' %}
+                                    <button class="btn btn-outline-danger btn-sm" onclick="cancelBooking({{ booking.id }})">
+                                        <i class="fas fa-times me-1"></i>Cancel Booking
+                                    </button>
+                                {% elif booking.status == 'confirmed' %}
+                                    <button class="btn btn-outline-danger btn-sm" onclick="cancelBooking({{ booking.id }})">
+                                        <i class="fas fa-times me-1"></i>Cancel Booking
+                                    </button>
+                                    {% if booking.is_approved %}
+                                        <a href="{{ url_for('food_menu', booking_id=booking.id) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-utensils me-1"></i>Order Food
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Food Orders for this booking -->
+                {% if booking.food_orders %}
+                <div class="col-lg-4 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h6 class="mb-0">Food Orders</h6>
+                        </div>
+                        <div class="card-body">
+                            {% for order in booking.food_orders %}
+                            <div class="border-bottom pb-2 mb-2">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-bold">{{ order.food_item.name }}</span>
+                                    <span class="text-primary">${{ "%.2f"|format(order.total_price) }}</span>
+                                </div>
+                                <small class="text-muted">Qty: {{ order.quantity }} | {{ order.order_date.strftime('%B %d, %Y') }}</small>
+                                <div class="mt-1">
+                                    {% if order.status == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% elif order.status == 'preparing' %}
+                                        <span class="badge bg-info">Preparing</span>
+                                    {% elif order.status == 'delivered' %}
+                                        <span class="badge bg-success">Delivered</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-calendar-times fa-4x text-muted mb-4"></i>
+                <h3 class="text-muted">No Bookings Found</h3>
+                <p class="lead text-muted">You haven't made any bookings yet.</p>
+                <a href="{{ url_for('rooms') }}" class="btn btn-primary btn-lg">Browse Rooms</a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Booking Statistics -->
+{% if bookings %}
+<section class="py-5 bg-light">
+    <div class="container">
+        <h3 class="text-center mb-4">Booking Summary</h3>
+        <div class="row">
+            <div class="col-md-3 text-center mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="text-primary">{{ bookings|length }}</h4>
+                        <p class="text-muted">Total Bookings</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="text-success">{{ bookings|selectattr('status', 'equalto', 'confirmed')|list|length }}</h4>
+                        <p class="text-muted">Confirmed</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="text-warning">{{ bookings|selectattr('status', 'equalto', 'pending')|list|length }}</h4>
+                        <p class="text-muted">Pending</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 text-center mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h4 class="text-info">${{ "%.2f"|format(bookings|selectattr('status', 'equalto', 'confirmed')|sum(attribute='total_price')) }}</h4>
+                        <p class="text-muted">Total Spent</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function cancelBooking(bookingId) {
+    if (confirm('Are you sure you want to cancel this booking?')) {
+        window.location.href = `/cancel_booking/${bookingId}`;
+    }
+}
+</script>
+{% endblock %} 

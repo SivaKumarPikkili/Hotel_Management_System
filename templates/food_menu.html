@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Food Menu - Luxury Hotel{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('my_bookings') }}">My Bookings</a></li>
+                <li class="breadcrumb-item active">Food Menu</li>
+            </ol>
+        </nav>
+        <div class="row">
+            <div class="col-lg-8">
+                <h1 class="display-4 mb-3">Food Menu</h1>
+                <p class="lead text-muted">Order delicious meals to be delivered to your room</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Booking Details:</strong> Room {{ booking.room.room_number }} | 
+                    Check-in: {{ booking.check_in.strftime('%B %d, %Y') }} | 
+                    Check-out: {{ booking.check_out.strftime('%B %d, %Y') }}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Food Categories -->
+<section class="py-5">
+    <div class="container">
+        <!-- Breakfast -->
+        <div class="food-category">
+            <h3 class="mb-4">
+                <i class="fas fa-sun me-2 text-warning"></i>Breakfast
+            </h3>
+            <div class="row">
+                {% for item in food_items if item.category == 'breakfast' %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name }}</h5>
+                            <p class="card-text text-muted">{{ item.description }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 text-primary mb-0">${{ "%.2f"|format(item.price) }}</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="addToOrder('{{ item.id }}', '{{ item.name }}', '{{ item.price }}')">
+                                    <i class="fas fa-plus me-1"></i>Add to Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Lunch -->
+        <div class="food-category">
+            <h3 class="mb-4">
+                <i class="fas fa-cloud-sun me-2 text-info"></i>Lunch
+            </h3>
+            <div class="row">
+                {% for item in food_items if item.category == 'lunch' %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name }}</h5>
+                            <p class="card-text text-muted">{{ item.description }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 text-primary mb-0">${{ "%.2f"|format(item.price) }}</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="addToOrder('{{ item.id }}', '{{ item.name }}', '{{ item.price }}')">
+                                    <i class="fas fa-plus me-1"></i>Add to Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Dinner -->
+        <div class="food-category">
+            <h3 class="mb-4">
+                <i class="fas fa-moon me-2 text-secondary"></i>Dinner
+            </h3>
+            <div class="row">
+                {% for item in food_items if item.category == 'dinner' %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name }}</h5>
+                            <p class="card-text text-muted">{{ item.description }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 text-primary mb-0">${{ "%.2f"|format(item.price) }}</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="addToOrder('{{ item.id }}', '{{ item.name }}', '{{ item.price }}')">
+                                    <i class="fas fa-plus me-1"></i>Add to Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Snacks -->
+        <div class="food-category">
+            <h3 class="mb-4">
+                <i class="fas fa-cookie-bite me-2 text-warning"></i>Snacks & Desserts
+            </h3>
+            <div class="row">
+                {% for item in food_items if item.category == 'snacks' %}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name }}</h5>
+                            <p class="card-text text-muted">{{ item.description }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 text-primary mb-0">${{ "%.2f"|format(item.price) }}</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="addToOrder('{{ item.id }}', '{{ item.name }}', '{{ item.price }}')">
+                                    <i class="fas fa-plus me-1"></i>Add to Order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Order Summary Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Your Order</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="orderItems">
+                    <!-- Order items will be populated here -->
+                </div>
+                <div class="mb-3">
+                    <label for="specialInstructions" class="form-label">Special Instructions</label>
+                    <textarea class="form-control" id="specialInstructions" rows="3" placeholder="Any special requests or dietary requirements..."></textarea>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5>Total: <span id="orderTotal" class="text-primary">$0.00</span></h5>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="placeOrder()">Place Order</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Order Button -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1000;">
+    <button class="btn btn-primary btn-lg rounded-circle" onclick="showOrderModal()" id="orderButton" style="display: none;">
+        <i class="fas fa-shopping-cart me-2"></i>
+        <span id="orderCount">0</span>
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let orderItems = [];
+let orderTotal = 0;
+
+function addToOrder(itemId, itemName, itemPrice) {
+    // Ensure id is integer and price is float
+    itemId = parseInt(itemId);
+    itemPrice = parseFloat(itemPrice);
+    const existingItem = orderItems.find(item => item.id === itemId);
+    if (existingItem) {
+        existingItem.quantity += 1;
+        existingItem.total = existingItem.quantity * existingItem.price;
+    } else {
+        orderItems.push({
+            id: itemId,
+            name: itemName,
+            price: itemPrice,
+            quantity: 1,
+            total: itemPrice
+        });
+    }
+    
+    updateOrderDisplay();
+    
+    // Show success message
+    const toast = document.createElement('div');
+    toast.className = 'toast position-fixed top-0 end-0 m-3';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <div class="toast-header">
+            <strong class="me-auto">Added to Order</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            ${itemName} added to your order
+        </div>
+    `;
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Remove toast after it's hidden
+    toast.addEventListener('hidden.bs.toast', () => {
+        document.body.removeChild(toast);
+    });
+}
+
+function updateOrderDisplay() {
+    const orderCount = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+    const orderButton = document.getElementById('orderButton');
+    const countSpan = document.getElementById('orderCount');
+    
+    if (orderCount > 0) {
+        orderButton.style.display = 'block';
+        countSpan.textContent = orderCount;
+    } else {
+        orderButton.style.display = 'none';
+    }
+}
+
+function showOrderModal() {
+    const orderItemsDiv = document.getElementById('orderItems');
+    const orderTotalSpan = document.getElementById('orderTotal');
+    
+    if (orderItems.length === 0) {
+        orderItemsDiv.innerHTML = '<p class="text-muted">No items in your order</p>';
+        orderTotalSpan.textContent = '$0.00';
+    } else {
+        let itemsHtml = '';
+        let total = 0;
+        
+        orderItems.forEach(item => {
+            itemsHtml += `
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
+                    <div>
+                        <h6 class="mb-1">${item.name}</h6>
+                        <small class="text-muted">$${item.price.toFixed(2)} each</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="updateQuantity('${item.id}', -1)">-</button>
+                        <span class="mx-2">${item.quantity}</span>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="updateQuantity('${item.id}', 1)">+</button>
+                        <span class="ms-3 fw-bold">$${item.total.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+            total += item.total;
+        });
+        
+        orderItemsDiv.innerHTML = itemsHtml;
+        orderTotalSpan.textContent = `$${total.toFixed(2)}`;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('orderModal'));
+    modal.show();
+}
+
+function updateQuantity(itemId, change) {
+    const item = orderItems.find(item => item.id === itemId);
+    if (item) {
+        item.quantity += change;
+        if (item.quantity <= 0) {
+            orderItems = orderItems.filter(item => item.id !== itemId);
+        } else {
+            item.total = item.quantity * item.price;
+        }
+        updateOrderDisplay();
+        showOrderModal(); // Refresh modal
+    }
+}
+
+function placeOrder() {
+    if (orderItems.length === 0) {
+        alert('Please add items to your order');
+        return;
+    }
+    const specialInstructions = document.getElementById('specialInstructions').value;
+    // Prepare items with correct types
+    const itemsPayload = orderItems.map(item => ({
+        id: parseInt(item.id),
+        quantity: parseInt(item.quantity)
+    }));
+    fetch('/order_food', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            booking_id: "{{ booking.id }}",
+            items: itemsPayload,
+            special_instructions: specialInstructions
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Clear cart
+            orderItems = [];
+            updateOrderDisplay();
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('orderModal'));
+            modal.hide();
+            alert('Order placed successfully!');
+            location.reload();
+        } else {
+            alert('Error placing order: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Something went wrong. Please try again.');
+    });
+}
+
+</script>
+{% endblock %} 

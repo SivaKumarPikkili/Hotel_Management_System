@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Add Room Images - Admin{% endblock %}
+
+{% block content %}
+<section class="py-5">
+    <div class="container">
+        <h2 class="mb-4">Add Images to Room {{ room.room_number }}</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="images" class="form-label">Select Images</label>
+                <input type="file" class="form-control" id="images" name="images" multiple required>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload Images</button>
+            <a href="{{ url_for('admin_rooms') }}" class="btn btn-secondary ms-2">Cancel</a>
+        </form>
+        <hr>
+        <h4>Current Images</h4>
+        <div class="row">
+            {% for img in room.images %}
+            <div class="col-md-3 mb-3">
+                <div class="card">
+                    <img src="{{ url_for('static', filename=img.image_path) }}" class="card-img-top" style="height:150px;object-fit:cover;">
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

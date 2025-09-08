@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Book Room {{ room.room_number }} - Luxury Hotel{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Room Information Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-bed me-2"></i>Room {{ room.room_number }} - {{ room.room_type.name }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">{{ room.room_type.description }}</p>
+
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <strong><i class="fas fa-users me-2"></i>Capacity:</strong>
+                            <span class="badge bg-info">{{ room.room_type.capacity }} Guests</span>
+                        </div>
+                        <div class="col-6">
+                            <strong><i class="fas fa-dollar-sign me-2"></i>Price:</strong>
+                            <span class="badge bg-success">${{ "%.2f"|format(room.room_type.base_price) }}/night</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <strong><i class="fas fa-door-open me-2"></i>Room Status:</strong>
+                        {% if room.is_available %}
+                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Available</span>
+                        {% else %}
+                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Unavailable</span>
+                        {% endif %}
+                    </div>
+
+                    {% if room.room_type.amenities %}
+                    <div class="mb-3">
+                        <strong><i class="fas fa-star me-2"></i>Amenities:</strong>
+                        <p class="text-muted">{{ room.room_type.amenities }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Room Images Section (if any) -->
+                    {% if room.images %}
+                    <div class="mb-3">
+                        <strong><i class="fas fa-images me-2"></i>Room Images:</strong>
+                        <div class="row mt-2">
+                            {% for image in room.images[:3] %}
+                            <div class="col-4">
+                                <img src="{{ url_for('static', filename=image.image_path) }}" class="img-fluid rounded"
+                                    alt="Room {{ room.room_number }}">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Additional Room Info -->
+            <div class="card mt-3 shadow-sm">
+                <div class="card-body">
+                    <h6><i class="fas fa-info-circle me-2"></i>Booking Information</h6>
+                    <ul class="list-unstyled small text-muted mb-0">
+                        <li><i class="fas fa-clock me-2"></i>Check-in: 3:00 PM</li>
+                        <li><i class="fas fa-clock me-2"></i>Check-out: 11:00 AM</li>
+                        <li><i class="fas fa-user-tie me-2"></i>Admin approval required</li>
+                        <li><i class="fas fa-utensils me-2"></i>Room service available after approval</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking Form Section -->
+        <div class="col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>Book This Room
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if room.is_available %}
+                    <form method="POST" id="bookingForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="check_in" class="form-label">
+                                    <i class="fas fa-calendar-check me-1"></i>Check-in Date
+                                </label>
+                                <input type="date" class="form-control" id="check_in" name="check_in" min="{{ today }}"
+                                    required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="check_out" class="form-label">
+                                    <i class="fas fa-calendar-times me-1"></i>Check-out Date
+                                </label>
+                                <input type="date" class="form-control" id="check_out" name="check_out"
+                                    min="{{ today }}" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="special_requests" class="form-label">
+                                <i class="fas fa-comment me-1"></i>Special Requests (Optional)
+                            </label>
+                            <textarea class="form-control" id="special_requests" name="special_requests" rows="3"
+                                placeholder="Any special requirements or preferences..."></textarea>
+                        </div>
+
+                        <!-- Booking Summary -->
+                        <div class="card bg-light mb-3" id="bookingSummary" style="display: none;">
+                            <div class="card-body">
+                                <h6><i class="fas fa-calculator me-2"></i>Booking Summary</h6>
+                                <div class="d-flex justify-content-between">
+                                    <span>Duration:</span>
+                                    <span id="duration">-</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Rate per night:</span>
+                                    <span>${{ "%.2f"|format(room.room_type.base_price) }}</span>
+                                </div>
+                                <hr class="my-2">
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Total Amount:</span>
+                                    <span id="totalAmount">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-calendar-check me-2"></i>Book Now
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h5>Room Unavailable</h5>
+                        <p class="text-muted">This room is currently not available for booking.</p>
+                        <a href="{{ url_for('rooms') }}" class="btn btn-primary">
+                            <i class="fas fa-search me-2"></i>Browse Other Rooms
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Need Help Section -->
+            <div class="card mt-3 border-info">
+                <div class="card-body text-center">
+                    <h6 class="text-info"><i class="fas fa-question-circle me-2"></i>Need Help?</h6>
+                    <p class="mb-2 small">Have questions about this room or booking process?</p>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="toggleChat()">
+                        <i class="fas fa-robot me-1"></i>Ask Our AI Assistant
+                    </button>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            Or call us at <strong>+1 (555) 123-4567</strong>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back to Rooms Button -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('rooms') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to All Rooms
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Page-specific JavaScript -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const checkInInput = document.getElementById('check_in');
+        const checkOutInput = document.getElementById('check_out');
+        const bookingSummary = document.getElementById('bookingSummary');
+        const durationSpan = document.getElementById('duration');
+        const totalAmountSpan = document.getElementById('totalAmount');
+        const basePrice = {{ room.room_type.base_price }
+    };
+
+    function updateBookingSummary() {
+        const checkInDate = new Date(checkInInput.value);
+        const checkOutDate = new Date(checkOutInput.value);
+
+        if (checkInDate && checkOutDate && checkOutDate > checkInDate) {
+            const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
+            const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            const totalAmount = daysDiff * basePrice;
+
+            durationSpan.textContent = daysDiff + (daysDiff === 1 ? ' night' : ' nights');
+            totalAmountSpan.textContent = '$' + totalAmount.toFixed(2);
+            bookingSummary.style.display = 'block';
+        } else {
+            bookingSummary.style.display = 'none';
+        }
+    }
+
+    // Update checkout minimum date when checkin changes
+    checkInInput.addEventListener('change', function () {
+        const checkInDate = new Date(this.value);
+        checkInDate.setDate(checkInDate.getDate() + 1);
+        checkOutInput.min = checkInDate.toISOString().split('T')[0];
+        updateBookingSummary();
+    });
+
+    checkOutInput.addEventListener('change', updateBookingSummary);
+
+    // Form validation
+    document.getElementById('bookingForm').addEventListener('submit', function (e) {
+        const checkInDate = new Date(checkInInput.value);
+        const checkOutDate = new Date(checkOutInput.value);
+
+        if (checkOutDate <= checkInDate) {
+            e.preventDefault();
+            alert('Check-out date must be after check-in date.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

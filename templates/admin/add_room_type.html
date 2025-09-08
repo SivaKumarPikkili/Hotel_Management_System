@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Add Room Type - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <nav class="col-md-3 col-lg-2 d-md-block admin-sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('admin_room_types') }}">
+                            <i class="fas fa-bed me-2"></i>Room Types
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_rooms') }}">
+                            <i class="fas fa-door-open me-2"></i>Rooms
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_bookings') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Bookings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_users') }}">
+                            <i class="fas fa-users me-2"></i>Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_food') }}">
+                            <i class="fas fa-utensils me-2"></i>Food Menu
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Add Room Type</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="{{ url_for('admin_room_types') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Room Types
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">Room Type Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="name" class="form-label">Room Type Name *</label>
+                                        <input type="text" class="form-control" id="name" name="name" required>
+                                        <div class="form-text">e.g., Deluxe Suite, Standard Room, Family Room</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="capacity" class="form-label">Capacity (Guests) *</label>
+                                        <input type="number" class="form-control" id="capacity" name="capacity" min="1" max="10" required>
+                                        <div class="form-text">Maximum number of guests this room type can accommodate</div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="base_price" class="form-label">Base Price per Night *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="base_price" name="base_price" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="form-text">The base price for one night stay in this room type</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="description" class="form-label">Description *</label>
+                                    <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+                                    <div class="form-text">Detailed description of the room type, amenities, and features</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="amenities" class="form-label">Amenities</label>
+                                    <textarea class="form-control" id="amenities" name="amenities" rows="3"></textarea>
+                                    <div class="form-text">List of amenities included in this room type (comma-separated)</div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{{ url_for('admin_room_types') }}" class="btn btn-secondary me-md-2">Cancel</a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Room Type
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h6 class="mb-0">Tips for Room Types</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-info-circle text-primary me-2"></i>
+                                    <strong>Name:</strong> Use descriptive names that guests can easily understand
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-users text-success me-2"></i>
+                                    <strong>Capacity:</strong> Consider the typical guest needs for this room type
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-dollar-sign text-warning me-2"></i>
+                                    <strong>Price:</strong> Set competitive prices based on market research
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-list text-info me-2"></i>
+                                    <strong>Amenities:</strong> List key features that make this room type special
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card shadow mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Example Room Types</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6 class="text-primary">Deluxe Suite</h6>
+                                <small class="text-muted">Luxury accommodation with premium amenities</small>
+                            </div>
+                            <div class="mb-3">
+                                <h6 class="text-success">Standard Room</h6>
+                                <small class="text-muted">Comfortable room with essential amenities</small>
+                            </div>
+                            <div class="mb-3">
+                                <h6 class="text-info">Family Room</h6>
+                                <small class="text-muted">Spacious room perfect for families</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-resize textarea
+document.getElementById('description').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = this.scrollHeight + 'px';
+});
+
+document.getElementById('amenities').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = this.scrollHeight + 'px';
+});
+</script>
+{% endblock %} 

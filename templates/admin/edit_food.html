@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Edit Food Item{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Edit Food Item</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Food Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ food_item.name }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description *</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required>{{ food_item.description }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="price" class="form-label">Price *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" id="price" name="price" step="0.01" min="0" value="{{ food_item.price }}" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="category" class="form-label">Category *</label>
+                                    <select class="form-select" id="category" name="category" required>
+                                        <option value="">Select Category</option>
+                                        <option value="breakfast" {% if food_item.category == 'breakfast' %}selected{% endif %}>Breakfast</option>
+                                        <option value="lunch" {% if food_item.category == 'lunch' %}selected{% endif %}>Lunch</option>
+                                        <option value="dinner" {% if food_item.category == 'dinner' %}selected{% endif %}>Dinner</option>
+                                        <option value="snacks" {% if food_item.category == 'snacks' %}selected{% endif %}>Snacks</option>
+                                        <option value="beverages" {% if food_item.category == 'beverages' %}selected{% endif %}>Beverages</option>
+                                        <option value="desserts" {% if food_item.category == 'desserts' %}selected{% endif %}>Desserts</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_available" name="is_available" {% if food_item.is_available %}checked{% endif %}>
+                                <label class="form-check-label" for="is_available">
+                                    Available for ordering
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_food') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Food List
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Food Item
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

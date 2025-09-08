@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Room - Admin{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-dark text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold">Edit Room</h1>
+                <p class="lead">Modify room information</p>
+            </div>
+            <div class="col-lg-4 text-end">
+                <a href="{{ url_for('admin_rooms') }}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Rooms
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Edit Room Form Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <h4 class="card-title mb-4">Room Information</h4>
+                        <form method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="name" class="form-label">Room Name *</label>
+                                    <input type="text" class="form-control" id="name" name="name" value="{{ room.name }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="room_type" class="form-label">Room Type *</label>
+                                    <select class="form-select" id="room_type" name="room_type" required>
+                                        <option value="Standard" {% if room.room_type == 'Standard' %}selected{% endif %}>Standard</option>
+                                        <option value="Suite" {% if room.room_type == 'Suite' %}selected{% endif %}>Suite</option>
+                                        <option value="Executive" {% if room.room_type == 'Executive' %}selected{% endif %}>Executive</option>
+                                        <option value="Family" {% if room.room_type == 'Family' %}selected{% endif %}>Family</option>
+                                        <option value="Budget" {% if room.room_type == 'Budget' %}selected{% endif %}>Budget</option>
+                                        <option value="Luxury" {% if room.room_type == 'Luxury' %}selected{% endif %}>Luxury</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="price" class="form-label">Price per Night ($) *</label>
+                                    <input type="number" class="form-control" id="price" name="price" step="0.01" min="0" value="{{ room.price }}" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="capacity" class="form-label">Capacity (Guests) *</label>
+                                    <input type="number" class="form-control" id="capacity" name="capacity" min="1" max="10" value="{{ room.capacity }}" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="image_url" class="form-label">Image URL *</label>
+                                <input type="url" class="form-control" id="image_url" name="image_url" value="{{ room.image_url }}" required>
+                                <div class="form-text">Enter a valid image URL (e.g., from Unsplash)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description *</label>
+                                <textarea class="form-control" id="description" name="description" rows="4" required>{{ room.description }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="amenities" class="form-label">Amenities</label>
+                                <textarea class="form-control" id="amenities" name="amenities" rows="3" placeholder="e.g., King Bed, Free WiFi, Mini Bar, Room Service">{{ room.amenities }}</textarea>
+                                <div class="form-text">List amenities separated by commas</div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_available" name="is_available" {% if room.is_available %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_available">
+                                        Room is available for booking
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save me-2"></i>Update Room
+                                </button>
+                                <a href="{{ url_for('admin_rooms') }}" class="btn btn-outline-secondary">
+                                    Cancel
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 

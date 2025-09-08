@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Room Types - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Admin Sidebar -->
+        <nav class="col-md-3 col-lg-2 d-md-block admin-sidebar collapse">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('admin_room_types') }}">
+                            <i class="fas fa-bed me-2"></i>Room Types
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_rooms') }}">
+                            <i class="fas fa-door-open me-2"></i>Rooms
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_bookings') }}">
+                            <i class="fas fa-calendar-check me-2"></i>Bookings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_users') }}">
+                            <i class="fas fa-users me-2"></i>Users
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_food') }}">
+                            <i class="fas fa-utensils me-2"></i>Food Menu
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Room Types Management</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <a href="{{ url_for('admin_add_room_type') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add Room Type
+                    </a>
+                </div>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Room Types Table -->
+            <div class="card shadow">
+                <div class="card-header">
+                    <h5 class="mb-0">All Room Types</h5>
+                </div>
+                <div class="card-body">
+                    {% if room_types %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Base Price</th>
+                                        <th>Capacity</th>
+                                        <th>Rooms Count</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for room_type in room_types %}
+                                    <tr>
+                                        <td>{{ room_type.id }}</td>
+                                        <td>
+                                            <strong>{{ room_type.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">{{ room_type.description[:100] }}{% if room_type.description|length > 100 %}...{% endif %}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">${{ "%.2f"|format(room_type.base_price) }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ room_type.capacity }} Guests</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ room_type.rooms|length }} Rooms</span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ room_type.created_at.strftime('%B %d, %Y') }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('admin_edit_room_type', type_id=room_type.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger delete-btn" 
+                                                        data-room-type-id="{{ room_type.id }}" 
+                                                        data-room-type-name="{{ room_type.name }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-bed fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Room Types Found</h5>
+                            <p class="text-muted">Start by adding your first room type.</p>
+                            <a href="{{ url_for('admin_add_room_type') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>Add Room Type
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+
+        </main>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the room type "<span id="roomTypeName"></span>"?</p>
+                <p class="text-danger"><small>This action cannot be undone and will also delete all rooms of this type.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to delete buttons
+    document.querySelectorAll('.delete-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const roomTypeId = this.getAttribute('data-room-type-id');
+            const roomTypeName = this.getAttribute('data-room-type-name');
+            
+            document.getElementById('roomTypeName').textContent = roomTypeName;
+            document.getElementById('confirmDelete').onclick = function() {
+                // Use a form submission instead of direct URL navigation
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/admin/room_types/${roomTypeId}/delete`;
+                document.body.appendChild(form);
+                form.submit();
+            };
+            const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            modal.show();
+        });
+    });
+});
+</script>
+<style>
+.border-left-primary {
+    border-left: 0.25rem solid #4e73df !important;
+}
+.border-left-success {
+    border-left: 0.25rem solid #1cc88a !important;
+}
+.border-left-info {
+    border-left: 0.25rem solid #36b9cc !important;
+}
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+.text-gray-800 {
+    color: #5a5c69 !important;
+}
+</style>
+{% endblock %} 

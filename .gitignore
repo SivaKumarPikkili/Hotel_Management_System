@@ -1,0 +1,43 @@
+# Environment variables (IMPORTANT - Contains API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+instance/
+hotel.db
+
+# Google API Credentials (IMPORTANT - Contains secrets)
+credentials.json
+client_secret*.json
+token.json
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files  
+.DS_Store
+Thumbs.db
+
+# Uploads and static files
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Logs
+*.log
+
+# Cache
+.cache/

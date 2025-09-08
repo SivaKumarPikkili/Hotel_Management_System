@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Bookings - Admin{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-dark text-white">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="display-4 fw-bold">Manage Bookings</h1>
+                <p class="lead">View and manage all hotel reservations</p>
+            </div>
+            <div class="col-lg-4 text-end">
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Bookings Table Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Guest</th>
+                                <th>Room</th>
+                                <th>Check-in</th>
+                                <th>Check-out</th>
+                                <th>Nights</th>
+                                <th>Total Price</th>
+                                <th>Status</th>
+                                <th>Special Requests</th>
+                                <th>Booking Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in bookings %}
+                            <tr>
+                                <td>
+                                    <strong>#{{ booking.id }}</strong>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ booking.user.username }}</strong><br>
+                                        <small class="text-muted">{{ booking.user.email }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ booking.room.name }}</strong><br>
+                                        <small class="text-muted">{{ booking.room.room_type }} - {{ booking.room.capacity }} Guests</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ booking.check_in.strftime('%m/%d/%Y') }}</span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ booking.check_out.strftime('%m/%d/%Y') }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ (booking.check_out - booking.check_in).days }} nights</span>
+                                </td>
+                                <td>
+                                    <span class="text-primary fw-bold">${{ "%.2f"|format(booking.total_price) }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if booking.status == 'confirmed' %}bg-success{% elif booking.status == 'cancelled' %}bg-danger{% elif booking.status == 'completed' %}bg-primary{% else %}bg-warning{% endif %}">
+                                        {{ booking.status.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if booking.special_requests %}
+                                        <small class="text-muted">{{ booking.special_requests[:30] }}{% if booking.special_requests|length > 30 %}...{% endif %}</small>
+                                    {% else %}
+                                        <small class="text-muted">None</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ booking.booking_date.strftime('%m/%d/%Y %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        {% if booking.status == 'confirmed' %}
+                                            <a href="{{ url_for('admin_booking_action', booking_id=booking.id, action='complete') }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               onclick="return confirm('Mark booking as completed?')">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                            <a href="{{ url_for('admin_booking_action', booking_id=booking.id, action='cancel') }}" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('Cancel this booking?')">
+                                                <i class="fas fa-times"></i>
+                                            </a>
+                                        {% elif booking.status == 'pending' %}
+                                            <a href="{{ url_for('admin_booking_action', booking_id=booking.id, action='confirm') }}" 
+                                               class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 

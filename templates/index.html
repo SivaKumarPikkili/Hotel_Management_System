@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Welcome - Luxury Hotel{% endblock %}
+
+{% block content %}
+<style>
+/* Hero Section Styles */
+.hero-section {
+    position: relative;
+    height: 100vh;
+    background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), 
+                url('https://images.unsplash.com/photo-1564501049412-61c2a3083791?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+}
+
+.hero-content h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.hero-content p {
+    font-size: 1.3rem;
+    margin-bottom: 2rem;
+    max-width: 600px;
+}
+
+.cta-button {
+    display: inline-block;
+    padding: 15px 35px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 50px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    color: white;
+    text-decoration: none;
+}
+
+/* Features Section */
+.features-section {
+    padding: 80px 0;
+    background: #f8f9fa;
+}
+
+.feature-card {
+    text-align: center;
+    padding: 40px 30px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+}
+
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    color: white;
+    font-size: 2rem;
+}
+
+/* Room Types Preview */
+.rooms-preview {
+    padding: 80px 0;
+}
+
+.room-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    height: 100%;
+}
+
+.room-card:hover {
+    transform: translateY(-5px);
+}
+
+.room-image {
+    height: 200px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.room-content {
+    padding: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+    
+    .hero-content p {
+        font-size: 1.1rem;
+    }
+}
+</style>
+
+<!-- Hero Section -->
+<div class="hero-section">
+    <div class="hero-content">
+        <h1>Experience Luxury Redefined</h1>
+        <p>Discover unparalleled comfort and elegance in the heart of the city. Your perfect stay awaits.</p>
+        <a href="{{ url_for('rooms') }}" class="cta-button">Explore Our Rooms</a>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="features-section">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-4 font-weight-bold">Why Choose Us</h2>
+            <p class="lead">Experience world-class hospitality with our premium services</p>
+        </div>
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <h5 class="font-weight-bold">Luxury Rooms</h5>
+                    <p>Premium accommodations with modern amenities and stunning views</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-utensils"></i>
+                    </div>
+                    <h5 class="font-weight-bold">Fine Dining</h5>
+                    <p>Exquisite cuisine prepared by world-class chefs using finest ingredients</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-concierge-bell"></i>
+                    </div>
+                    <h5 class="font-weight-bold">24/7 Service</h5>
+                    <p>Round-the-clock personalized service to cater to your every need</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h5 class="font-weight-bold">AI Assistant</h5>
+                    <p>Get instant help with bookings and information through our smart chatbot</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h2 class="display-5 font-weight-bold mb-4">Discover a world of luxury and comfort at our prestigious hotel.</h2>
+                <p class="lead">Our hotel offers the perfect blend of modern amenities and classic elegance. Each room is thoughtfully designed to provide you with the ultimate comfort and relaxation experience.</p>
+            </div>
+            <div class="col-lg-6">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="text-center p-3">
+                            <i class="fas fa-bed fa-3x text-primary mb-3"></i>
+                            <h6>Premium Comfort</h6>
+                            <p class="small">All our rooms are designed with your comfort in mind, featuring premium bedding and modern amenities.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="text-center p-3">
+                            <i class="fas fa-utensils fa-3x text-primary mb-3"></i>
+                            <h6>Gourmet Dining</h6>
+                            <p class="small">Enjoy delicious meals at our on-site restaurant with a variety of local and international cuisines.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="text-center p-3">
+                            <i class="fas fa-concierge-bell fa-3x text-primary mb-3"></i>
+                            <h6>Concierge Service</h6>
+                            <p class="small">Our dedicated staff is available round the clock to ensure your stay is perfect in every way.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="text-center p-3">
+                            <i class="fas fa-phone fa-3x text-primary mb-3"></i>
+                            <h6>24/7 Support</h6>
+                            <p class="small">Contact us today to make your reservation or learn more about our services.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Room Types Preview -->
+<div class="rooms-preview">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="display-4 font-weight-bold">Our Accommodations</h2>
+            <p class="lead">Choose from our carefully curated selection of luxury rooms</p>
+        </div>
+        <div class="row">
+            {% for room_type in room_types %}
+            <div class="col-md-6 col-lg-3 mb-4">
+                <div class="room-card">
+                    <div class="room-image">
+                        <i class="fas fa-hotel fa-3x"></i>
+                    </div>
+                    <div class="room-content">
+                        <h5 class="font-weight-bold">{{ room_type.name }}</h5>
+                        <p class="text-muted small">{{ room_type.description[:80] }}...</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-primary font-weight-bold">${{ "%.0f"|format(room_type.base_price) }}/night</span>
+                            <small class="text-muted">{{ room_type.capacity }} guests</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-4">
+            <a href="{{ url_for('rooms') }}" class="btn btn-primary btn-lg">View All Rooms</a>
+        </div>
+    </div>
+</div>
+
+<!-- Call to Action Section -->
+<section class="py-5 bg-primary text-white text-center">
+    <div class="container">
+        <h2 class="mb-3">Ready to Experience Luxury?</h2>
+        <p class="lead mb-4">Contact us today to make your reservation or learn more about our services.</p>
+        <a href="{{ url_for('contact') }}" class="btn btn-light btn-lg me-3">Contact Us</a>
+        <a href="{{ url_for('rooms') }}" class="btn btn-outline-light btn-lg">Book Now</a>
+    </div>
+</section>
+
+{% endblock %}

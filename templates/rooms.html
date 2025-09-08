@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Our Rooms - Luxury Hotel{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto text-center">
+                <h1 class="display-4 mb-3">Our Room Types</h1>
+                <p class="lead text-muted">Discover our carefully curated selection of room types designed for your comfort and satisfaction.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Room Types Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            {% for room_type in room_types %}
+            <div class="col-lg-6 mb-5">
+                <div class="card room-card h-100 shadow-sm">
+                    <div class="row g-0">
+                        <div class="col-md-5">
+                            <img src="{{ url_for('static', filename='rooms/std.png') }}" class="img-fluid h-100" style="object-fit: cover;" alt="{{ room_type.name }}">
+                        </div>
+                        <div class="col-md-7">
+                            <div class="card-body">
+                                <h4 class="card-title">{{ room_type.name }}</h4>
+                                <p class="card-text text-muted">{{ room_type.description }}</p>
+                                
+                                <div class="mb-3">
+                                    <h5 class="text-primary mb-2">${{ room_type.base_price }} <small class="text-muted">per night</small></h5>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-secondary">{{ room_type.capacity }} Guests</span>
+                                        <span class="text-success">
+                                            <i class="fas fa-check-circle me-1"></i>Available
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {% if room_type.amenities %}
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Amenities:</h6>
+                                    <div class="row">
+                                        {% for amenity in room_type.amenities.split(', ') %}
+                                        <div class="col-6">
+                                            <small class="text-muted">
+                                                <i class="fas fa-check me-1"></i>{{ amenity }}
+                                            </small>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('room_type_detail', type_id=room_type.id) }}" class="btn btn-primary">
+                                    <i class="fas fa-eye me-1"></i>View Rooms
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h2 class="text-center mb-5">Hotel Amenities</h2>
+        <div class="row">
+            <div class="col-md-3 text-center mb-4">
+                <div class="mb-3">
+                    <i class="fas fa-wifi fa-2x text-primary"></i>
+                </div>
+                <h5>Free WiFi</h5>
+                <p class="text-muted">High-speed internet throughout the hotel</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="mb-3">
+                    <i class="fas fa-parking fa-2x text-primary"></i>
+                </div>
+                <h5>Free Parking</h5>
+                <p class="text-muted">Complimentary parking for all guests</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="mb-3">
+                    <i class="fas fa-utensils fa-2x text-primary"></i>
+                </div>
+                <h5>Restaurant</h5>
+                <p class="text-muted">On-site dining with room service</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="mb-3">
+                    <i class="fas fa-dumbbell fa-2x text-primary"></i>
+                </div>
+                <h5>Fitness Center</h5>
+                <p class="text-muted">24/7 access to fitness facilities</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Booking CTA -->
+<section class="py-5 bg-primary text-white">
+    <div class="container text-center">
+        <h2>Ready to Book Your Stay?</h2>
+        <p class="lead">Choose your preferred room type and check availability for your desired dates.</p>
+        <a href="{{ url_for('contact') }}" class="btn btn-light btn-lg">Contact Us</a>
+    </div>
+</section>
+{% endblock %} 
