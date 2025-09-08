@@ -324,9 +324,12 @@ def initialize_database():
         db.session.rollback()
 
 # 🔥 INITIALIZE DATABASE ON APP STARTUP
-@app.before_first_request
+@app.before_request
 def setup_database():
-    initialize_database()
+    if not hasattr(app, 'initialized'):
+        initialize_database()
+        app.initialized = True
+
 
 # Routes with error handling
 @app.route('/')
